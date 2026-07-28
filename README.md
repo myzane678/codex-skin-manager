@@ -64,4 +64,25 @@ npm run make
 
 部分视觉规则和 Windows DOM 集成参考了 [Codex Dream Skin](https://github.com/Fei-Away/Codex-Dream-Skin) 的 MIT 许可实现。完整第三方声明见 [NOTICE.md](NOTICE.md)。
 
-本项目以 [MIT License](LICENSE) 发布。版本变更见 [CHANGELOG.md](CHANGELOG.md)。
+本项目以 [MIT License](LICENSE) 发布。版本变更见下方更新日志。
+
+## 更新日志
+
+### [0.1.2] - 2026-07-28
+
+- 将更新日志收录到 README，作为唯一的用户更新入口。
+
+### [0.1.1] - 2026-07-28
+
+- 添加 MIT `LICENSE`。
+- README 补充许可证说明。
+- 补充 Squirrel Windows 安装器所需的发布作者元数据。
+
+### [0.1.0] - 2026-07-28
+
+- 支持 Codex 主题包的导入、导出、启用、停用、重命名和删除。
+- 提供四个内置主题，并支持从本地图片创建主题。
+- 支持主题实时切换，不需要重启 Codex。
+- 支持 Codex++ 在 `127.0.0.1:9229` 暴露 CDP 时自动附加主题。
+- 支持 CDP 断线重连和管理器单实例锁，避免重复注入冲突。
+- 支持托盘快捷主题切换和运行时诊断。

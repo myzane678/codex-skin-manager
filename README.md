@@ -16,7 +16,7 @@ Windows 上的 Codex 主题管理器。它通过本机 Chrome DevTools Protocol 
 
 ## 安装与运行
 
-从 [Releases](https://github.com/myzane678/codex-skin-manager/releases) 下载并运行 `Codex Skin Manager-0.1.0 Setup.exe`。
+从 [Releases](https://github.com/myzane678/codex-skin-manager/releases) 下载最新的 Windows 安装程序并运行。
 
 启动管理器后，选择一个主题即可应用。若 Codex 由 Codex++ 启动并开放本机 `9229` 端口，管理器会自动附加，不需要点击“启动主题版”。
 
@@ -63,3 +63,5 @@ npm run make
 ## 致谢与许可
 
 部分视觉规则和 Windows DOM 集成参考了 [Codex Dream Skin](https://github.com/Fei-Away/Codex-Dream-Skin) 的 MIT 许可实现。完整第三方声明见 [NOTICE.md](NOTICE.md)。
+
+本项目以 [MIT License](LICENSE) 发布。版本变更见 [CHANGELOG.md](CHANGELOG.md)。

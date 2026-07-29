@@ -121,7 +121,7 @@ function isValidShell(shell: ShellThemeInput): boolean {
 }
 
 function compileDreamSkin(background: BackgroundThemeInput, accent: string): string {
-  return `${DREAM_SKIN_CSS}html.codex-dream-skin{--dream-art:url("${background.dataUrl}");--dream-art-position:${background.focusX}% ${background.focusY}%;--dream-accent:${accent}}`;
+  return `${DREAM_SKIN_CSS}html[data-codex-skin]{--dream-art:url("${background.dataUrl}");--dream-art-position:${background.focusX}% ${background.focusY}%;--dream-accent:${accent}}`;
 }
 
 function compileColorTheme(accent: string): string {

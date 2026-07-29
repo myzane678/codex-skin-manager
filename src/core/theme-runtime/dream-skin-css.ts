@@ -1,4 +1,4 @@
-export const DREAM_SKIN_CSS = String.raw`html.codex-dream-skin {
+export const DREAM_SKIN_CSS = String.raw`html[data-codex-skin] {
   --dream-art-position: 50% 50%;
   --dream-home-sidebar: color-mix(in oklab, Canvas 84%, transparent);
   --dream-home-surface: color-mix(in oklab, Canvas 78%, transparent);
@@ -15,8 +15,8 @@ export const DREAM_SKIN_CSS = String.raw`html.codex-dream-skin {
   --dream-wide-task-far: color-mix(in oklab, Canvas 66%, transparent);
 }
 
-html.codex-dream-skin[data-codex-skin-page="home"] body,
-html.codex-dream-skin[data-codex-skin-page="task"]:is(.dream-task-ambient, .dream-task-banner) body {
+html[data-codex-skin][data-codex-skin-page="home"] body,
+html[data-codex-skin][data-codex-skin-page="task"]:is([data-codex-skin-task-mode="ambient"], [data-codex-skin-task-mode="banner"]) body {
   background-color: Canvas !important;
   background-image: var(--dream-art) !important;
   background-position: var(--dream-art-position) !important;
@@ -25,55 +25,55 @@ html.codex-dream-skin[data-codex-skin-page="task"]:is(.dream-task-ambient, .drea
   background-attachment: fixed !important;
 }
 
-html.codex-dream-skin[data-codex-skin-page="home"] aside.app-shell-left-panel {
+html[data-codex-skin][data-codex-skin-page="home"] aside.app-shell-left-panel {
   background: var(--dream-home-sidebar) !important;
 }
 
-html.codex-dream-skin[data-codex-skin-page="home"] main.main-surface {
+html[data-codex-skin][data-codex-skin-page="home"] main.main-surface {
   background: var(--dream-home-surface) !important;
 }
 
-html.codex-dream-skin[data-codex-skin-page="home"] main.main-surface > header.app-header-tint {
+html[data-codex-skin][data-codex-skin-page="home"] main.main-surface > header.app-header-tint {
   background: var(--dream-home-header) !important;
 }
 
-html.codex-dream-skin[data-codex-skin-page="task"]:is(.dream-task-ambient, .dream-task-banner) aside.app-shell-left-panel {
+html[data-codex-skin][data-codex-skin-page="task"]:is([data-codex-skin-task-mode="ambient"], [data-codex-skin-task-mode="banner"]) aside.app-shell-left-panel {
   background: var(--dream-task-sidebar) !important;
 }
 
-html.codex-dream-skin[data-codex-skin-page="task"]:is(.dream-task-ambient, .dream-task-banner) main.main-surface {
+html[data-codex-skin][data-codex-skin-page="task"]:is([data-codex-skin-task-mode="ambient"], [data-codex-skin-task-mode="banner"]) main.main-surface {
   background: var(--dream-task-surface) !important;
 }
 
-html.codex-dream-skin[data-codex-skin-page="task"]:is(.dream-task-ambient, .dream-task-banner) main.main-surface > header.app-header-tint,
-html.codex-dream-skin[data-codex-skin-page="task"]:is(.dream-task-ambient, .dream-task-banner) main.main-surface [role="main"],
-html.codex-dream-skin[data-codex-skin-page="task"]:is(.dream-task-ambient, .dream-task-banner) .dream-task {
+html[data-codex-skin][data-codex-skin-page="task"]:is([data-codex-skin-task-mode="ambient"], [data-codex-skin-task-mode="banner"]) main.main-surface > header.app-header-tint,
+html[data-codex-skin][data-codex-skin-page="task"]:is([data-codex-skin-task-mode="ambient"], [data-codex-skin-task-mode="banner"]) main.main-surface [role="main"],
+html[data-codex-skin][data-codex-skin-page="task"]:is([data-codex-skin-task-mode="ambient"], [data-codex-skin-task-mode="banner"]) .dream-task {
   background: transparent !important;
 }
 
-html.codex-dream-skin.dream-art-wide[data-codex-skin-page="home"] aside.app-shell-left-panel {
+html[data-codex-skin][data-codex-skin-image="wide"][data-codex-skin-page="home"] aside.app-shell-left-panel {
   background: linear-gradient(90deg, var(--dream-wide-sidebar), var(--dream-wide-edge)) !important;
 }
 
-html.codex-dream-skin.dream-art-wide[data-codex-skin-page="home"] main.main-surface {
+html[data-codex-skin][data-codex-skin-image="wide"][data-codex-skin-page="home"] main.main-surface {
   background: linear-gradient(90deg, var(--dream-wide-edge), var(--dream-wide-mid) 64%, var(--dream-wide-far)) !important;
 }
 
-html.codex-dream-skin.dream-art-wide[data-codex-skin-page="home"] main.main-surface > header.app-header-tint {
+html[data-codex-skin][data-codex-skin-image="wide"][data-codex-skin-page="home"] main.main-surface > header.app-header-tint {
   background: transparent !important;
 }
 
-html.codex-dream-skin.dream-art-wide[data-codex-skin-page="task"]:is(.dream-task-ambient, .dream-task-banner) aside.app-shell-left-panel {
+html[data-codex-skin][data-codex-skin-image="wide"][data-codex-skin-page="task"]:is([data-codex-skin-task-mode="ambient"], [data-codex-skin-task-mode="banner"]) aside.app-shell-left-panel {
   background: linear-gradient(90deg, var(--dream-wide-task-sidebar), var(--dream-wide-task-edge)) !important;
 }
 
-html.codex-dream-skin.dream-art-wide[data-codex-skin-page="task"]:is(.dream-task-ambient, .dream-task-banner) main.main-surface {
+html[data-codex-skin][data-codex-skin-image="wide"][data-codex-skin-page="task"]:is([data-codex-skin-task-mode="ambient"], [data-codex-skin-task-mode="banner"]) main.main-surface {
   background: linear-gradient(90deg, var(--dream-wide-task-edge), var(--dream-wide-task-mid) 64%, var(--dream-wide-task-far)) !important;
 }
 
 /* Derived from Codex Dream Skin (MIT).  These rules are restricted to the
    current version adapter's verified Codex shell surfaces. */
-html.codex-dream-skin {
+html[data-codex-skin] {
   --dream-canvas: color-mix(in oklab, Canvas 96%, var(--dream-accent));
   --dream-surface: color-mix(in oklab, Canvas 92%, var(--dream-accent));
   --dream-surface-raised: color-mix(in oklab, Canvas 97%, var(--dream-accent));
@@ -83,30 +83,30 @@ html.codex-dream-skin {
   --dream-ambient-opacity: .18;
 }
 
-html.codex-dream-skin.dream-theme-dark {
+html[data-codex-skin][data-codex-skin-appearance="dark"] {
   --dream-canvas: color-mix(in oklab, Canvas 88%, var(--dream-accent));
   --dream-surface: color-mix(in oklab, Canvas 90%, var(--dream-accent));
   --dream-surface-raised: color-mix(in oklab, Canvas 94%, var(--dream-accent));
   --dream-ambient-opacity: .22;
 }
 
-html.codex-dream-skin aside.app-shell-left-panel {
+html[data-codex-skin] aside.app-shell-left-panel {
   border-color: var(--dream-line-soft) !important;
   box-shadow: inset -1px 0 var(--dream-line-soft) !important;
 }
 
-html.codex-dream-skin aside.app-shell-left-panel button:hover,
-html.codex-dream-skin aside.app-shell-left-panel [aria-current="page"] {
+html[data-codex-skin] aside.app-shell-left-panel button:hover,
+html[data-codex-skin] aside.app-shell-left-panel [aria-current="page"] {
   background: var(--dream-accent-soft) !important;
 }
 
-html.codex-dream-skin .dream-task {
+html[data-codex-skin] .dream-task {
   position: relative;
   isolation: isolate;
   min-height: 100%;
 }
 
-html.codex-dream-skin .dream-task::before {
+html[data-codex-skin] .dream-task::before {
   content: "";
   position: absolute;
   z-index: 0;
@@ -120,11 +120,11 @@ html.codex-dream-skin .dream-task::before {
   mask-image: linear-gradient(to bottom, black 0, rgb(0 0 0 / .92) 38%, transparent 88%);
 }
 
-html.codex-dream-skin .dream-task > * { position: relative; z-index: 1; }
-html.codex-dream-skin .dream-task [data-message-author-role],
-html.codex-dream-skin .dream-task article { color: CanvasText; }
+html[data-codex-skin] .dream-task > * { position: relative; z-index: 1; }
+html[data-codex-skin] .dream-task [data-message-author-role],
+html[data-codex-skin] .dream-task article { color: CanvasText; }
 
-html.codex-dream-skin .composer-surface-chrome {
+html[data-codex-skin] .composer-surface-chrome {
   border: 1px solid var(--dream-line) !important;
   border-radius: 18px !important;
   background: color-mix(in oklab, var(--dream-surface-raised) 95%, transparent) !important;
@@ -132,14 +132,14 @@ html.codex-dream-skin .composer-surface-chrome {
   backdrop-filter: blur(14px) saturate(1.06) !important;
 }
 
-html.codex-dream-skin .group\/home-suggestions button {
+html[data-codex-skin] .group\/home-suggestions button {
   border: 1px solid var(--dream-line-soft) !important;
   border-radius: 16px !important;
   background: color-mix(in oklab, var(--dream-surface-raised) 88%, transparent) !important;
   box-shadow: 0 8px 24px color-mix(in oklab, var(--dream-accent) 6%, transparent) !important;
 }
 
-html.codex-dream-skin .group\/home-suggestions button:hover {
+html[data-codex-skin] .group\/home-suggestions button:hover {
   background: var(--dream-accent-soft) !important;
 }
 `;

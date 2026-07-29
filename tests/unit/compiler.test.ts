@@ -51,7 +51,8 @@ describe('compileInjectionPlan', () => {
 
     expect(plan.styleText).toContain('--dream-art:url("data:image/png;base64,YmFja2dyb3VuZA==")');
     expect(plan.styleText).toContain('--dream-art-position:72% 45%');
-    expect(plan.styleText).toContain('html.codex-dream-skin');
+    expect(plan.styleText).toContain('html[data-codex-skin]');
+    expect(plan.styleText).not.toContain('html.codex-dream-skin');
     expect(plan.styleText).toContain('pointer-events: none');
     expect(plan.styleText).not.toMatch(/@import|javascript:|https:\/\/evil\.test/);
     expect(plan.decoration).toBeNull();
@@ -138,9 +139,9 @@ describe('compileInjectionPlan', () => {
       },
     });
 
-    expect(plan.styleText).toContain('html.codex-dream-skin[data-codex-skin-page="home"] main.main-surface');
-    expect(plan.styleText).toContain('html.codex-dream-skin[data-codex-skin-page="home"] main.main-surface > header.app-header-tint');
-    expect(plan.styleText).not.toMatch(/html\.codex-dream-skin\[data-codex-skin-page="home"\][^{]*\bbutton\b/);
+    expect(plan.styleText).toContain('html[data-codex-skin][data-codex-skin-page="home"] main.main-surface');
+    expect(plan.styleText).toContain('html[data-codex-skin][data-codex-skin-page="home"] main.main-surface > header.app-header-tint');
+    expect(plan.styleText).not.toMatch(/html\[data-codex-skin\]\[data-codex-skin-page="home"\][^{]*\bbutton\b/);
   });
 
   it('compiles an immersive wide-image home surface with a controlled safe area', () => {
@@ -153,7 +154,7 @@ describe('compileInjectionPlan', () => {
     });
 
     expect(plan.presentation).toEqual({ appearance: 'dark', imageLayout: 'wide', safeArea: 'left', taskMode: 'ambient' });
-    expect(plan.styleText).toContain('html.codex-dream-skin.dream-art-wide');
+    expect(plan.styleText).toContain('html[data-codex-skin][data-codex-skin-image="wide"]');
     expect(plan.styleText).toContain('main.main-surface');
     expect(plan.styleText).toMatch(/background-attachment:\s*fixed/);
   });
@@ -168,10 +169,10 @@ describe('compileInjectionPlan', () => {
     });
 
     expect(plan.styleText).toContain('--dream-art:url("data:image/png;base64,YmFja2dyb3VuZA==")');
-    expect(plan.styleText).toMatch(/html\.codex-dream-skin\[data-codex-skin-page="home"\]\s+body/);
+    expect(plan.styleText).toMatch(/html\[data-codex-skin\]\[data-codex-skin-page="home"\]\s+body/);
     expect(plan.styleText).toContain('aside.app-shell-left-panel');
-    expect(plan.styleText).toMatch(/dream-art-wide\[data-codex-skin-page="home"\] main\.main-surface\s*\{\s*background: linear-gradient\(90deg,\s*var\(--dream-wide-edge\),\s*var\(--dream-wide-mid\) 64%,\s*var\(--dream-wide-far\)\) !important/);
-    expect(plan.styleText).toMatch(/dream-art-wide\[data-codex-skin-page="home"\]\s+aside\.app-shell-left-panel[\s\S]*?var\(--dream-wide-sidebar\)/);
+    expect(plan.styleText).toMatch(/data-codex-skin-image="wide"\]\[data-codex-skin-page="home"\] main\.main-surface\s*\{\s*background: linear-gradient\(90deg,\s*var\(--dream-wide-edge\),\s*var\(--dream-wide-mid\) 64%,\s*var\(--dream-wide-far\)\) !important/);
+    expect(plan.styleText).toMatch(/data-codex-skin-image="wide"\]\[data-codex-skin-page="home"\]\s+aside\.app-shell-left-panel[\s\S]*?var\(--dream-wide-sidebar\)/);
     expect(plan.styleText).toContain('.composer-surface-chrome');
     expect(plan.styleText).not.toContain('background-color:rgba(244,247,250,0.76)');
   });
@@ -203,7 +204,7 @@ describe('compileInjectionPlan', () => {
       },
     });
 
-    expect(plan.styleText).toMatch(/html\.codex-dream-skin\.dream-art-wide\[data-codex-skin-page="task"\]:is\(\.dream-task-ambient,\s*\.dream-task-banner\)/);
+    expect(plan.styleText).toMatch(/html\[data-codex-skin\]\[data-codex-skin-image="wide"\]\[data-codex-skin-page="task"\]:is\(\[data-codex-skin-task-mode="ambient"\],\s*\[data-codex-skin-task-mode="banner"\]\)/);
     expect(plan.styleText).toContain('var(--dream-wide-task-edge)');
   });
 
@@ -218,7 +219,7 @@ describe('compileInjectionPlan', () => {
 
     expect(plan.presentation).toEqual({ appearance: 'light', imageLayout: 'standard', safeArea: 'center', taskMode: 'off' });
     expect(plan.styleText).not.toContain('.dream-task-off');
-    expect(plan.styleText).toMatch(/data-codex-skin-page="task"\]:is\(\.dream-task-ambient, \.dream-task-banner\)/);
+    expect(plan.styleText).toMatch(/data-codex-skin-page="task"\]:is\(\[data-codex-skin-task-mode="ambient"\], \[data-codex-skin-task-mode="banner"\]\)/);
   });
 
   it('keeps Dream Skin image surfaces authoritative when a legacy shell token is present', () => {

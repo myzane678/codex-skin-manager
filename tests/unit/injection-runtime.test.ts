@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-implied-eval -- JSDOM 夹具需执行注入函数源码。 */
 import { JSDOM } from 'jsdom';
-import { describe, expect, it } from 'vitest';
-import { APPLY_FUNCTION, ROLLBACK_FUNCTION } from '../../src/core/theme-runtime/injection-runtime';
+import { describe, expect, it, vi } from 'vitest';
+import type { CdpPageSession } from '../../src/core/ports/runtime-ports';
+import { APPLY_FUNCTION, EARLY_APPLY_FUNCTION, InjectionRuntime, ROLLBACK_FUNCTION } from '../../src/core/theme-runtime/injection-runtime';
 
 function execute<TArgs extends unknown[]>(source: string, window: { Function: FunctionConstructor }, ...args: TArgs): unknown {
   const factory = window.Function(`return (${source})`) as () => unknown;
@@ -46,6 +47,32 @@ const shell = '<!doctype html><html><head></head><body><header data-testid="app-
 const currentCodexShell = '<!doctype html><html><head></head><body><aside class="app-shell-left-panel"><nav role="navigation"><button>Native nav</button></nav></aside><main class="main-surface"><header data-testid="app-shell-header-context-menu-surface"></header><button>Native action</button><input value="Native input"></main></body></html>';
 
 describe('injection DOM functions', () => {
+  it('keeps the early bootstrap alive until the Codex shell is ready without waiting for body', () => {
+    expect(EARLY_APPLY_FUNCTION).not.toContain('!document.body');
+    expect(EARLY_APPLY_FUNCTION).toContain('function(plan, revision)');
+    expect(EARLY_APPLY_FUNCTION).toContain('const generation = revision || plan.runId');
+    expect(EARLY_APPLY_FUNCTION).toContain('window[generationKey] !== generation');
+    expect(EARLY_APPLY_FUNCTION).toContain('DOMContentLoaded');
+    expect(EARLY_APPLY_FUNCTION).toContain('setInterval(install, 250)');
+    expect(EARLY_APPLY_FUNCTION).toContain('setTimeout(stop, 10000)');
+  });
+
+  it('audits the matching renderer runtime and style node before reporting an active run', async () => {
+    const call = vi.fn<(method: string, params: { expression: string; returnByValue: boolean }) => Promise<unknown>>(
+      () => Promise.resolve({ result: { value: true } }),
+    );
+    const session = { call } as unknown as CdpPageSession;
+
+    await expect(new InjectionRuntime().isApplied(session, 'audit-run')).resolves.toBe(true);
+
+    const invocation = call.mock.calls[0];
+    if (!invocation) throw new Error('CDP_CALL_NOT_RECORDED');
+    expect(invocation[0]).toBe('Runtime.evaluate');
+    expect(invocation[1].returnByValue).toBe(true);
+    expect(invocation[1].expression).toContain('window.__CODEX_SKIN_RUNTIME__');
+    expect(invocation[1].expression).toContain('style[data-codex-skin=\\"audit-run\\"]');
+  });
+
   it('adds its decoration inside the verified main shell without changing native controls', () => {
     const dom = new JSDOM(shell, { runScripts: 'outside-only', url: 'https://codex.local/' });
     execute(APPLY_FUNCTION, dom.window, legacyPlan('run-1'));
@@ -127,24 +154,45 @@ describe('injection DOM functions', () => {
     expect(main?.classList.contains('dream-home-shell')).toBe(false);
   });
 
-  it('adds and removes the Dream Skin route classes on the observed Codex shell', () => {
+  it('uses stable root attributes and removes them with the observed Codex route state', () => {
     const dom = new JSDOM(currentCodexShell.replace('<main class="main-surface">', '<main class="main-surface"><div role="main"><div data-testid="home-icon"></div></div>'), { runScripts: 'outside-only', url: 'https://codex.local/' });
     execute(APPLY_FUNCTION, dom.window, plan('dream-classes'));
 
     const root = dom.window.document.documentElement;
     const main = dom.window.document.querySelector('main.main-surface');
     const route = dom.window.document.querySelector('[role="main"]');
-    expect(root.classList.contains('codex-dream-skin')).toBe(true);
-    expect(root.classList.contains('dream-art-wide')).toBe(true);
-    expect(root.classList.contains('dream-theme-light')).toBe(true);
+    expect(root.getAttribute('data-codex-skin-appearance')).toBe('light');
+    expect(root.getAttribute('data-codex-skin-image')).toBe('wide');
+    expect(root.getAttribute('data-codex-skin-task-mode')).toBe('ambient');
+    expect(root.classList.contains('codex-dream-skin')).toBe(false);
     expect(main?.classList.contains('dream-home-shell')).toBe(true);
     expect(route?.classList.contains('dream-home')).toBe(true);
 
     execute(ROLLBACK_FUNCTION, dom.window, 'dream-classes');
 
-    expect(root.classList.contains('codex-dream-skin')).toBe(false);
+    expect(root.getAttribute('data-codex-skin-appearance')).toBeNull();
     expect(main?.classList.contains('dream-home-shell')).toBe(false);
     expect(route?.classList.contains('dream-home')).toBe(false);
+  });
+
+  it('preserves the root state and style node when the same run refreshes its SPA route', () => {
+    const dom = new JSDOM(currentCodexShell, { runScripts: 'outside-only', url: 'https://codex.local/' });
+    execute(APPLY_FUNCTION, dom.window, plan('persistent-run'));
+
+    const root = dom.window.document.documentElement;
+    const state = (dom.window as unknown as { __CODEX_SKIN_RUNTIME__?: unknown }).__CODEX_SKIN_RUNTIME__;
+    const style = dom.window.document.querySelector('style[data-codex-skin="persistent-run"]');
+    const route = dom.window.document.createElement('div');
+    route.setAttribute('role', 'main');
+    dom.window.document.querySelector('main.main-surface')?.appendChild(route);
+    route.replaceChildren(dom.window.document.createElement('article'));
+
+    execute(APPLY_FUNCTION, dom.window, { ...plan('persistent-run'), decoration: null });
+
+    expect((dom.window as unknown as { __CODEX_SKIN_RUNTIME__?: unknown }).__CODEX_SKIN_RUNTIME__).toBe(state);
+    expect(dom.window.document.querySelector('style[data-codex-skin="persistent-run"]')).toBe(style);
+    expect(root.getAttribute('data-codex-skin-appearance')).toBe('light');
+    expect(root.getAttribute('data-codex-skin')).toBe('persistent-run');
   });
 
   it('resolves automatic appearance from the native Codex color scheme', () => {
@@ -157,10 +205,23 @@ describe('injection DOM functions', () => {
       presentation: { appearance: 'auto', imageLayout: 'wide', safeArea: 'auto', taskMode: 'auto' },
     });
 
-    expect(dom.window.document.documentElement.classList.contains('dream-theme-dark')).toBe(true);
-    expect(dom.window.document.documentElement.classList.contains('dream-theme-light')).toBe(false);
-    expect(dom.window.document.documentElement.classList.contains('dream-safe-center')).toBe(true);
-    expect(dom.window.document.documentElement.classList.contains('dream-task-ambient')).toBe(true);
+    expect(dom.window.document.documentElement.getAttribute('data-codex-skin-appearance')).toBe('dark');
+    expect(dom.window.document.documentElement.getAttribute('data-codex-skin-safe-area')).toBe('center');
+    expect(dom.window.document.documentElement.getAttribute('data-codex-skin-task-mode')).toBe('ambient');
+  });
+
+  it('keeps theme state active when Codex replaces the root class list', () => {
+    const dom = new JSDOM(currentCodexShell, { runScripts: 'outside-only', url: 'https://codex.local/' });
+    execute(APPLY_FUNCTION, dom.window, plan('class-reconciliation'));
+
+    const root = dom.window.document.documentElement;
+    root.className = 'electron-light';
+
+    expect(root.className).toBe('electron-light');
+    expect(root.getAttribute('data-codex-skin')).toBe('class-reconciliation');
+    expect(root.getAttribute('data-codex-skin-appearance')).toBe('light');
+    expect(root.getAttribute('data-codex-skin-image')).toBe('wide');
+    expect(root.getAttribute('data-codex-skin-task-mode')).toBe('ambient');
   });
 
   it('restores its own style after a verified shell rerenders and removes its runtime state on rollback', () => {

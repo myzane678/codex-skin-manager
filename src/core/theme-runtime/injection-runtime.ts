@@ -2,6 +2,8 @@ import type { CdpPageSession } from '../ports/runtime-ports';
 import type { InjectionPlan } from './compiler';
 
 export class InjectionRuntime {
+  private earlyRevision = 0;
+
   async apply(session: CdpPageSession, plan: InjectionPlan): Promise<void> {
     await session.call('Runtime.evaluate', {
       expression: `(${APPLY_FUNCTION})(${JSON.stringify(plan)})`,
@@ -10,13 +12,28 @@ export class InjectionRuntime {
   }
 
   async installEarly(session: CdpPageSession, plan: InjectionPlan): Promise<string> {
+    const revision = `${plan.runId}:${++this.earlyRevision}`;
     const result = await session.call<unknown>('Page.addScriptToEvaluateOnNewDocument', {
-      source: `(${EARLY_APPLY_FUNCTION})(${JSON.stringify(plan)})`,
+      source: `(${EARLY_APPLY_FUNCTION})(${JSON.stringify(plan)}, ${JSON.stringify(revision)})`,
     });
     if (!result || typeof result !== 'object' || typeof (result as { identifier?: unknown }).identifier !== 'string') {
       throw new Error('CDP_EARLY_SCRIPT_UNVERIFIED');
     }
     return (result as { identifier: string }).identifier;
+  }
+
+  async isApplied(session: CdpPageSession, runId: string): Promise<boolean> {
+    if (!/^[a-zA-Z0-9-]{1,64}$/.test(runId)) throw new Error('RUN_ID_INVALID');
+    const selector = `style[data-codex-skin="${runId}"]`;
+    const result = await session.call<unknown>('Runtime.evaluate', {
+      expression: `(() => {
+        const runtime = window.__CODEX_SKIN_RUNTIME__;
+        return Boolean(runtime && runtime.runId === ${JSON.stringify(runId)}
+          && document.querySelector(${JSON.stringify(selector)}));
+      })()`,
+      returnByValue: true,
+    });
+    return (result as { result?: { value?: unknown } }).result?.value === true;
   }
 
   async removeEarly(session: CdpPageSession, identifier: string): Promise<void> {
@@ -36,6 +53,10 @@ export class InjectionRuntime {
 export const APPLY_FUNCTION = `function(plan) {
   const STATE_KEY = '__CODEX_SKIN_RUNTIME__';
   const previous = window[STATE_KEY];
+  if (previous && previous.runId === plan.runId && typeof previous.ensure === 'function') {
+    previous.ensure();
+    return true;
+  }
   if (previous && typeof previous.cleanup === 'function') previous.cleanup();
   const root = document.documentElement;
   const selector = 'style[data-codex-skin="' + plan.runId + '"], .codex-skin-decoration[data-codex-skin="' + plan.runId + '"]';
@@ -59,19 +80,13 @@ export const APPLY_FUNCTION = `function(plan) {
       const home = routeMains.find(function(candidate) { return Boolean(candidate.querySelector(shell.homeMarker)); }) || null;
       // 当前 Codex 首页没有旧 home-icon 或路由 main 时，保守地把语义主壳层视为首页。
       const isHome = routeMains.length === 0 || Boolean(home);
-      root.classList.add('codex-dream-skin');
-      root.classList.toggle('dream-theme-light', appearance === 'light');
-      root.classList.toggle('dream-theme-dark', appearance === 'dark');
-      root.classList.toggle('dream-art-wide', plan.presentation.imageLayout === 'wide');
-      root.classList.toggle('dream-art-standard', plan.presentation.imageLayout === 'standard');
-      ['left', 'center', 'right'].forEach(function(value) { root.classList.toggle('dream-safe-' + value, safeArea === value); });
-      ['ambient', 'banner', 'off'].forEach(function(value) { root.classList.toggle('dream-task-' + value, taskMode === value); });
       routeMains.forEach(function(candidate) {
         candidate.classList.toggle('dream-home', candidate === home);
         candidate.classList.toggle('dream-task', candidate !== home);
       });
       main.classList.toggle('dream-home-shell', isHome);
       root.setAttribute('data-codex-skin-page', isHome ? 'home' : 'task');
+      root.setAttribute('data-codex-skin-appearance', appearance);
       root.setAttribute('data-codex-skin-image', plan.presentation.imageLayout);
       root.setAttribute('data-codex-skin-safe-area', safeArea);
       root.setAttribute('data-codex-skin-task-mode', taskMode);
@@ -129,7 +144,7 @@ export const APPLY_FUNCTION = `function(plan) {
       if (scheduler.timeout) clearTimeout(scheduler.timeout);
       document.querySelectorAll(selector).forEach((node) => node.remove());
       if (root.getAttribute('data-codex-skin') === plan.runId) root.removeAttribute('data-codex-skin');
-      ['data-codex-skin-page', 'data-codex-skin-image', 'data-codex-skin-safe-area', 'data-codex-skin-task-mode'].forEach(function(attribute) { root.removeAttribute(attribute); });
+      ['data-codex-skin-page', 'data-codex-skin-appearance', 'data-codex-skin-image', 'data-codex-skin-safe-area', 'data-codex-skin-task-mode'].forEach(function(attribute) { root.removeAttribute(attribute); });
       root.classList.remove('codex-dream-skin', 'dream-theme-light', 'dream-theme-dark', 'dream-art-wide', 'dream-art-standard', 'dream-safe-left', 'dream-safe-center', 'dream-safe-right', 'dream-task-ambient', 'dream-task-banner', 'dream-task-off');
       document.querySelectorAll('.dream-home').forEach(function(node) { node.classList.remove('dream-home'); });
       document.querySelectorAll('.dream-task').forEach(function(node) { node.classList.remove('dream-task'); });
@@ -141,22 +156,34 @@ export const APPLY_FUNCTION = `function(plan) {
   return true;
 }`;
 
-export const EARLY_APPLY_FUNCTION = `function(plan) {
+export const EARLY_APPLY_FUNCTION = `function(plan, revision) {
+  const generationKey = '__CODEX_SKIN_EARLY_GENERATION__';
+  const generation = revision || plan.runId;
+  window[generationKey] = generation;
+  let bootstrapTimer = null;
+  let timeout = null;
+  const stop = function() {
+    if (bootstrapTimer) clearInterval(bootstrapTimer);
+    bootstrapTimer = null;
+    if (timeout) clearTimeout(timeout);
+    timeout = null;
+  };
   const install = function() {
+    if (window[generationKey] !== generation) {
+      stop();
+      return true;
+    }
     const root = document.documentElement;
     const shell = plan.shell;
-    if (!root || !document.body || !shell || !document.querySelector(shell.header) || !document.querySelector(shell.navigation) || !document.querySelector(shell.sidebar) || !document.querySelector(shell.main)) return false;
+    if (!root || !shell || !document.querySelector(shell.header) || !document.querySelector(shell.navigation) || !document.querySelector(shell.sidebar) || !document.querySelector(shell.main)) return false;
+    stop();
     (${APPLY_FUNCTION})(plan);
     return true;
   };
   if (install()) return true;
-  const observer = new MutationObserver(function() {
-    if (!install()) return;
-    observer.disconnect();
-    clearTimeout(timeout);
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  const timeout = setTimeout(function() { observer.disconnect(); }, 10000);
+  document.addEventListener?.('DOMContentLoaded', install, { once: true });
+  bootstrapTimer = setInterval(install, 250);
+  timeout = setTimeout(stop, 10000);
   return false;
 }`;
 
@@ -168,7 +195,7 @@ export const ROLLBACK_FUNCTION = `function(runId) {
   if (document.documentElement.getAttribute('data-codex-skin') === runId) {
     document.documentElement.removeAttribute('data-codex-skin');
   }
-  ['data-codex-skin-page', 'data-codex-skin-image', 'data-codex-skin-safe-area', 'data-codex-skin-task-mode'].forEach(function(attribute) { document.documentElement.removeAttribute(attribute); });
+  ['data-codex-skin-page', 'data-codex-skin-appearance', 'data-codex-skin-image', 'data-codex-skin-safe-area', 'data-codex-skin-task-mode'].forEach(function(attribute) { document.documentElement.removeAttribute(attribute); });
   document.documentElement.classList.remove('codex-dream-skin', 'dream-theme-light', 'dream-theme-dark', 'dream-art-wide', 'dream-art-standard', 'dream-safe-left', 'dream-safe-center', 'dream-safe-right', 'dream-task-ambient', 'dream-task-banner', 'dream-task-off');
   document.querySelectorAll('.dream-home').forEach(function(node) { node.classList.remove('dream-home'); });
   document.querySelectorAll('.dream-task').forEach(function(node) { node.classList.remove('dream-task'); });

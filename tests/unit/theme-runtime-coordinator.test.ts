@@ -113,7 +113,7 @@ describe('ThemeRuntimeCoordinator', () => {
     const injector = {
       apply: vi.fn<InjectionPort['apply']>(),
       rollback: vi.fn<InjectionPort['rollback']>(() => Promise.resolve()),
-      installEarly: vi.fn(() => Promise.resolve('early-1')),
+      installEarly: vi.fn().mockResolvedValueOnce('early-1').mockResolvedValueOnce('early-2'),
       removeEarly: vi.fn(() => Promise.resolve()),
     };
     const coordinator = new ThemeRuntimeCoordinator(createCdp(fixture.session), injector, () => 'run-1');
@@ -126,17 +126,18 @@ describe('ThemeRuntimeCoordinator', () => {
     expect(injector.installEarly).toHaveBeenCalledWith(fixture.session, firstPlan);
 
     await coordinator.refresh();
-    expect(injector.removeEarly).toHaveBeenCalledWith(fixture.session, 'early-1');
-    expect(injector.rollback).toHaveBeenCalledWith(fixture.session, 'run-1');
-    expect(injector.apply).toHaveBeenLastCalledWith(fixture.session, expect.objectContaining({ decoration: null }));
+    expect(injector.removeEarly).not.toHaveBeenCalled();
+    expect(injector.installEarly).toHaveBeenCalledTimes(1);
+    expect(injector.rollback).not.toHaveBeenCalled();
+    expect(injector.apply).toHaveBeenCalledTimes(1);
   });
 
-  it('reapplies the plan after a route switch so the injection runtime can update page markers', async () => {
+  it('keeps the active runtime mounted when a route switch changes only page scope', async () => {
     const fixture = createSession([welcome, welcome, task]);
     const injector = {
       apply: vi.fn<InjectionPort['apply']>(),
       rollback: vi.fn<InjectionPort['rollback']>(),
-      installEarly: vi.fn(() => Promise.resolve('early-1')),
+      installEarly: vi.fn().mockResolvedValueOnce('early-1').mockResolvedValueOnce('early-2'),
       removeEarly: vi.fn(() => Promise.resolve()),
     };
     const coordinator = new ThemeRuntimeCoordinator(createCdp(fixture.session), injector, () => 'run-1');
@@ -144,9 +145,10 @@ describe('ThemeRuntimeCoordinator', () => {
     await coordinator.start(9335, theme, vi.fn());
     await coordinator.refresh();
 
-    expect(injector.rollback).toHaveBeenCalledWith(fixture.session, 'run-1');
-    expect(injector.apply).toHaveBeenCalledTimes(2);
-    expect(injector.apply).toHaveBeenLastCalledWith(fixture.session, expect.objectContaining({ decoration: null }));
+    expect(injector.rollback).not.toHaveBeenCalled();
+    expect(injector.apply).toHaveBeenCalledTimes(1);
+    expect(injector.removeEarly).not.toHaveBeenCalled();
+    expect(injector.installEarly).toHaveBeenCalledTimes(1);
   });
 
   it('rolls back when the verified Codex shell disappears', async () => {
@@ -177,6 +179,65 @@ describe('ThemeRuntimeCoordinator', () => {
     expect(injector.apply).toHaveBeenCalledTimes(1);
     expect(injector.installEarly).toHaveBeenCalledTimes(1);
     expect(injector.removeEarly).not.toHaveBeenCalled();
+  });
+
+  it('keeps the live injection active when early-script registration is unavailable', async () => {
+    const fixture = createSession([welcome, welcome, welcome]);
+    const injector = {
+      apply: vi.fn(() => Promise.resolve()),
+      rollback: vi.fn(() => Promise.resolve()),
+      installEarly: vi.fn(() => Promise.reject(new Error('CDP_EARLY_UNAVAILABLE'))),
+    };
+    const coordinator = new ThemeRuntimeCoordinator(createCdp(fixture.session), injector, () => 'run-1');
+
+    await coordinator.start(9335, theme, vi.fn());
+
+    expect(injector.apply).toHaveBeenCalledTimes(1);
+    fixture.fireLoad();
+    await vi.waitFor(() => expect(injector.apply).toHaveBeenCalledTimes(2));
+  });
+
+  it('reapplies the active plan when the renderer audit reports it missing', async () => {
+    const fixture = createSession([welcome, welcome, welcome]);
+    const injector = {
+      apply: vi.fn(() => Promise.resolve()),
+      rollback: vi.fn(() => Promise.resolve()),
+      isApplied: vi.fn(() => Promise.resolve(false)),
+    };
+    const coordinator = new ThemeRuntimeCoordinator(createCdp(fixture.session), injector, () => 'run-1');
+
+    await coordinator.start(9335, theme, vi.fn());
+    await coordinator.refresh();
+
+    expect(injector.isApplied).toHaveBeenCalledWith(fixture.session, 'run-1');
+    expect(injector.apply).toHaveBeenCalledTimes(2);
+  });
+
+  it('reconnects to a replacement verified target after the active target disconnects', async () => {
+    const replacementTarget = { ...target, id: 'target-2', webSocketDebuggerUrl: 'ws://127.0.0.1:9335/devtools/page/target-2' };
+    const first = createSession([welcome, welcome]);
+    const second = createSession([welcome, welcome]);
+    const cdp: CdpPort = {
+      readBrowserIdentity: vi.fn(() => Promise.resolve({ browserId: 'browser-1' })),
+      listTargets: vi.fn()
+        .mockResolvedValueOnce([target])
+        .mockResolvedValueOnce([target])
+        .mockResolvedValueOnce([replacementTarget])
+        .mockResolvedValue([replacementTarget]),
+      openPageSession: vi.fn()
+        .mockResolvedValueOnce(first.session)
+        .mockResolvedValueOnce(second.session),
+      call: vi.fn(),
+    };
+    const injector = { apply: vi.fn(() => Promise.resolve()), rollback: vi.fn(() => Promise.resolve()) };
+    const coordinator = new ThemeRuntimeCoordinator(cdp, injector, vi.fn().mockReturnValueOnce('run-1').mockReturnValueOnce('run-2'));
+
+    await coordinator.start(9335, theme, vi.fn());
+    first.fireDisconnect();
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    await vi.waitFor(() => expect(cdp.openPageSession).toHaveBeenCalledTimes(2));
+
+    expect(injector.apply).toHaveBeenLastCalledWith(second.session, expect.objectContaining({ runId: 'run-2' }));
   });
 
   it('clears local state without rolling back through a disconnected session', async () => {

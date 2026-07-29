@@ -5,6 +5,7 @@ import { buildCodexProbeScript, getCodexVersionAdapter, type CodexVersionAdapter
 export interface InjectionPort {
   apply(session: CdpPageSession, plan: InjectionPlan): Promise<void>;
   rollback(session: CdpPageSession, runId: string): Promise<void>;
+  isApplied?(session: CdpPageSession, runId: string): Promise<boolean>;
   installEarly?(session: CdpPageSession, plan: InjectionPlan): Promise<string>;
   removeEarly?(session: CdpPageSession, identifier: string): Promise<void>;
 }
@@ -98,13 +99,7 @@ export class ThemeRuntimeCoordinator {
           continue;
         }
         this.browserId = identity.browserId;
-        this.target = selected.target;
-        this.session = selected.session;
-        selected.session.onLoad(() => {
-          if (generation !== this.generation) return;
-          void this.refresh();
-        });
-        selected.session.onDisconnect(() => this.handleDisconnect(generation));
+        this.adoptSession(selected, generation);
         this.heartbeat = setInterval(() => { void this.refresh(); }, 2_000);
         await this.refresh();
         return;
@@ -155,7 +150,7 @@ export class ThemeRuntimeCoordinator {
       targetId: target.id,
       session,
       hasWelcomeDecoration: probe.isWelcomePage,
-      earlyScriptId: this.injector.installEarly ? await this.injector.installEarly(session, plan) : null,
+      earlyScriptId: await this.installEarly(session, plan),
       plan,
     };
 
@@ -233,33 +228,51 @@ export class ThemeRuntimeCoordinator {
   }
 
   private async performRefresh(generation: number): Promise<void> {
-    const session = this.session;
-    const target = this.target;
+    let session = this.session;
+    let target = this.target;
     const browserId = this.browserId;
     const theme = this.theme;
     const port = this.port;
     const adapter = this.adapter;
-    if (generation !== this.generation || !session || !target || !browserId || !theme || !port || !adapter || !session.isOpen()) return;
+    if (generation !== this.generation || !browserId || !theme || !port || !adapter) return;
 
     try {
+      if (!session || !target || !session.isOpen()) {
+        const selected = await this.openWelcomeSession(port, browserId, generation);
+        if (selected === 'adapter-mismatch') {
+          this.report({ phase: 'compatibility-degraded', errorCode: 'CODEX_ADAPTER_MISMATCH', adapterId: adapter.id });
+          return;
+        }
+        if (!selected) return;
+        this.adoptSession(selected, generation);
+        session = selected.session;
+        target = selected.target;
+      }
+      if (!session || !target) return;
+      const activeSession = session;
+      const activeTarget = target;
       const targets = await this.cdp.listTargets(port, browserId);
       if (generation !== this.generation) return;
-      if (!targets.some((candidate) => candidate.id === target.id)) {
+      if (!targets.some((candidate) => candidate.id === activeTarget.id)) {
         this.clearDisconnected(generation);
+        this.refreshQueued = true;
         return;
       }
-      const probe = await readProbe(session, adapter);
+      const probe = await readProbe(activeSession, adapter);
       if (generation !== this.generation) return;
       if (!probe.isCompatibleShell || !probe.nativeControlsVisible) {
         await this.rollback();
-        if (generation === this.generation) this.report({ phase: 'pending', browserId, targetId: target.id });
+        if (generation === this.generation) this.report({ phase: 'pending', browserId, targetId: activeTarget.id });
         return;
       }
-      if (this.activeRun?.hasWelcomeDecoration !== undefined && this.activeRun.hasWelcomeDecoration !== probe.isWelcomePage) {
-        await this.rollback();
-      }
       if (this.activeRun) {
-        this.report({ phase: 'applied', browserId, targetId: target.id, runId: this.activeRun.runId });
+        const activeRun = this.activeRun;
+        if (activeRun.hasWelcomeDecoration !== probe.isWelcomePage) {
+          activeRun.hasWelcomeDecoration = probe.isWelcomePage;
+        } else if (this.injector.isApplied && !await this.injector.isApplied(activeSession, activeRun.runId)) {
+          await this.injector.apply(activeSession, activeRun.plan);
+        }
+        this.report({ phase: 'applied', browserId, targetId: activeTarget.id, runId: activeRun.runId });
         return;
       }
       const runId = this.createRunId();
@@ -267,30 +280,34 @@ export class ThemeRuntimeCoordinator {
       const plan: InjectionPlan = { ...compiledPlan, shell: adapter.shell };
       const run: ActiveRun = {
         runId,
-        targetId: target.id,
-        session,
+        targetId: activeTarget.id,
+        session: activeSession,
         hasWelcomeDecoration: probe.isWelcomePage,
-        earlyScriptId: this.injector.installEarly ? await this.injector.installEarly(session, plan) : null,
+        earlyScriptId: await this.installEarly(activeSession, plan),
         plan,
       };
       this.activeRun = run;
       try {
-        await this.injector.apply(session, plan);
+        await this.injector.apply(activeSession, plan);
       } catch (error) {
         await this.removeEarly(run);
-        if (session.isOpen()) await this.injector.rollback(session, runId).catch(() => undefined);
+        if (activeSession.isOpen()) await this.injector.rollback(activeSession, runId).catch(() => undefined);
         if (this.activeRun === run) this.activeRun = null;
         throw error;
       }
       if (generation !== this.generation) {
-        if (session.isOpen()) await this.injector.rollback(session, runId).catch(() => undefined);
+        if (activeSession.isOpen()) await this.injector.rollback(activeSession, runId).catch(() => undefined);
         if (this.activeRun === run) this.activeRun = null;
         return;
       }
-      this.report({ phase: 'applied', browserId, targetId: target.id, runId, adapterId: adapter.id });
+      this.report({ phase: 'applied', browserId, targetId: activeTarget.id, runId, adapterId: adapter.id });
     } catch (error) {
       if (generation === this.generation && this.session?.isOpen()) {
-        this.report({ phase: 'failed', browserId, targetId: target.id, errorCode: errorCode(error) });
+        this.report(withBrowserId({
+          phase: 'failed',
+          errorCode: errorCode(error),
+          ...(target ? { targetId: target.id } : {}),
+        }, browserId));
       }
     }
   }
@@ -298,17 +315,44 @@ export class ThemeRuntimeCoordinator {
   private handleDisconnect(generation: number): void {
     if (generation !== this.generation) return;
     this.clearDisconnected(generation);
+    void this.refresh();
   }
 
   private clearDisconnected(generation: number): void {
     if (generation !== this.generation) return;
-    if (this.heartbeat) clearInterval(this.heartbeat);
-    this.heartbeat = null;
     this.session?.close();
     this.activeRun = null;
     this.session = null;
     this.target = null;
     this.report(withBrowserId({ phase: 'disconnected' }, this.browserId));
+  }
+
+  private adoptSession(selected: { target: CdpTarget; session: CdpPageSession }, generation: number): void {
+    this.target = selected.target;
+    this.session = selected.session;
+    selected.session.onLoad(() => {
+      if (generation !== this.generation) return;
+      const run = this.activeRun;
+      if (run?.session === selected.session && !run.earlyScriptId) {
+        setTimeout(() => {
+          if (generation === this.generation && this.activeRun === run && selected.session.isOpen()) {
+            void this.injector.apply(selected.session, run.plan).catch(() => undefined);
+          }
+        }, 250);
+        return;
+      }
+      void this.refresh();
+    });
+    selected.session.onDisconnect(() => this.handleDisconnect(generation));
+  }
+
+  private async installEarly(session: CdpPageSession, plan: InjectionPlan): Promise<string | null> {
+    if (!this.injector.installEarly) return null;
+    try {
+      return await this.injector.installEarly(session, plan);
+    } catch {
+      return null;
+    }
   }
 
   private async disposeCurrent(): Promise<void> {

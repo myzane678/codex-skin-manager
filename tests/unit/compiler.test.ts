@@ -31,6 +31,9 @@ describe('compileInjectionPlan', () => {
     });
 
     expect(forest.styleText).toContain('--color-theme-surface:84%');
+    expect(forest.styleText).toContain('.codex-skin-composer-dock{background:transparent!important}');
+    expect(forest.styleText).toContain('.thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary{background:transparent!important}');
+    expect(forest.styleText).not.toContain('padding-bottom');
     expect(neon.styleText).toContain('--color-theme-surface:82%');
     expect(amber.styleText).toContain('--color-theme-surface:94%');
   });
@@ -89,6 +92,8 @@ describe('compileInjectionPlan', () => {
     expect(plan.styleText).toContain('--dream-art-position:70% 35%');
     expect(plan.styleText).toMatch(/background-size:\s*cover/);
     expect(plan.styleText).toContain('main.main-surface');
+    expect(plan.styleText).toContain('.codex-skin-composer-dock{background:transparent!important}');
+    expect(plan.styleText).toContain('.thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary{background:transparent!important}');
     expect(plan.styleText).not.toMatch(/color-scheme|font-family|caret-color/);
     expect(plan.styleText).not.toMatch(/@import|javascript:|https:\/\/evil\.test/);
   });

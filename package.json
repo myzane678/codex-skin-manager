@@ -1,7 +1,7 @@
 {
   "name": "codex-skin-manager",
   "productName": "Codex Skin Manager",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Windows Codex welcome-page theme manager",
   "author": "myzane678",
   "main": ".vite/build/main.js",

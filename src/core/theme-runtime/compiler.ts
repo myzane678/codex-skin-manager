@@ -55,6 +55,7 @@ export interface InjectionPlan {
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 const RUN_ID = /^[a-zA-Z0-9-]{1,64}$/;
 const DATA_URL = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+const SHARED_SHELL_CSS = 'html[data-codex-skin] .codex-skin-composer-dock{background:transparent!important}html[data-codex-skin] .thread-scroll-container .bg-gradient-to-t.from-token-main-surface-primary{background:transparent!important}';
 
 export function compileInjectionPlan(input: CompileThemeInput, _includeWelcomeDecoration?: boolean): InjectionPlan {
   void _includeWelcomeDecoration;
@@ -68,9 +69,10 @@ export function compileInjectionPlan(input: CompileThemeInput, _includeWelcomeDe
   if (input.shell && !isValidShell(input.shell)) throw new Error('THEME_VALUE_INVALID');
 
   const presentation = input.background ? presentationFrom(input.background, input.appearance) : null;
-  const styleText = input.background && presentation
+  const themeStyleText = input.background && presentation
     ? compileDreamSkin(input.background, input.variables.accent)
     : compileColorTheme(input.variables.accent);
+  const styleText = `${themeStyleText}${SHARED_SHELL_CSS}`;
 
   return {
     runId: input.runId,

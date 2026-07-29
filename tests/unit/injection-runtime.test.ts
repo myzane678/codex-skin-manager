@@ -139,6 +139,29 @@ describe('injection DOM functions', () => {
     expect(dom.window.document.querySelector('button')?.textContent).toBe('Native nav');
   });
 
+  it('marks the composer sticky ancestor as an adaptive transparent dock', () => {
+    const taskShell = currentCodexShell.replace(
+      '<button>Native action</button>',
+      '<div role="main"><div class="sticky-shell"><div><textarea></textarea></div></div></div><button>Native action</button>',
+    );
+    const dom = new JSDOM(taskShell, { runScripts: 'outside-only', url: 'https://codex.local/' });
+    Object.defineProperty(dom.window, 'getComputedStyle', {
+      value: (element: Element) => ({
+        colorScheme: 'light',
+        position: element.classList.contains('sticky-shell') ? 'sticky' : 'static',
+      }),
+    });
+
+    execute(APPLY_FUNCTION, dom.window, plan('adaptive-composer-dock'));
+
+    const dock = dom.window.document.querySelector('.sticky-shell');
+    expect(dock?.classList.contains('codex-skin-composer-dock')).toBe(true);
+
+    execute(ROLLBACK_FUNCTION, dom.window, 'adaptive-composer-dock');
+
+    expect(dock?.classList.contains('codex-skin-composer-dock')).toBe(false);
+  });
+
   it('treats the current shell without a legacy home icon or route main as the home page', () => {
     const dom = new JSDOM(currentCodexShell, { runScripts: 'outside-only', url: 'https://codex.local/' });
     execute(APPLY_FUNCTION, dom.window, plan('current-home'));

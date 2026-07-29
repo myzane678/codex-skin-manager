@@ -68,6 +68,21 @@ export const APPLY_FUNCTION = `function(plan) {
     const sidebar = document.querySelector(shell.sidebar);
     const main = document.querySelector(shell.main);
     if (!root || !header || !nav || !sidebar || !main) return false;
+    const composerDocks = new Set();
+    document.querySelectorAll(shell.composer).forEach(function(composer) {
+      let candidate = composer.parentElement;
+      while (candidate && candidate !== main) {
+        if (getComputedStyle(candidate).position === 'sticky') {
+          composerDocks.add(candidate);
+          break;
+        }
+        candidate = candidate.parentElement;
+      }
+    });
+    document.querySelectorAll('.codex-skin-composer-dock').forEach(function(candidate) {
+      candidate.classList.toggle('codex-skin-composer-dock', composerDocks.has(candidate));
+    });
+    composerDocks.forEach(function(candidate) { candidate.classList.add('codex-skin-composer-dock'); });
     root.setAttribute('data-codex-skin', plan.runId);
     if (plan.presentation) {
       const computed = getComputedStyle(root);
@@ -149,6 +164,7 @@ export const APPLY_FUNCTION = `function(plan) {
       document.querySelectorAll('.dream-home').forEach(function(node) { node.classList.remove('dream-home'); });
       document.querySelectorAll('.dream-task').forEach(function(node) { node.classList.remove('dream-task'); });
       document.querySelectorAll('.dream-home-shell').forEach(function(node) { node.classList.remove('dream-home-shell'); });
+      document.querySelectorAll('.codex-skin-composer-dock').forEach(function(node) { node.classList.remove('codex-skin-composer-dock'); });
       if (window[STATE_KEY] && window[STATE_KEY].runId === plan.runId) delete window[STATE_KEY];
       return true;
     },
@@ -200,5 +216,6 @@ export const ROLLBACK_FUNCTION = `function(runId) {
   document.querySelectorAll('.dream-home').forEach(function(node) { node.classList.remove('dream-home'); });
   document.querySelectorAll('.dream-task').forEach(function(node) { node.classList.remove('dream-task'); });
   document.querySelectorAll('.dream-home-shell').forEach(function(node) { node.classList.remove('dream-home-shell'); });
+  document.querySelectorAll('.codex-skin-composer-dock').forEach(function(node) { node.classList.remove('codex-skin-composer-dock'); });
   return true;
 }`;

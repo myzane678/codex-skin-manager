@@ -10,7 +10,7 @@ const nativeSnapshot: ManagerSnapshot = {
   theme: 'native', cdp: 'connected', proxy: 'watching', recovery: 'idle', runtimeRunId: null, runtimeErrorCode: null, runtimeAdapterId: null, themes: [], diagnostic: '',
 };
 const appliedSnapshot: ManagerSnapshot = {
-  ...nativeSnapshot, theme: 'applied', themes: [{ id: 'night', version: '1.0.0', name: 'Night', source: 'unknown', active: true, accent: '#2f6f63', previewDataUrl: 'data:image/png;base64,' }],
+  ...nativeSnapshot, theme: 'applied', runtimeCompatibility: 'unverified', themes: [{ id: 'night', version: '1.0.0', name: 'Night', source: 'unknown', active: true, accent: '#2f6f63', previewDataUrl: 'data:image/png;base64,' }],
 };
 
 function api(onSnapshotChanged: CodexSkinApi['onSnapshotChanged']): CodexSkinApi {
@@ -36,6 +36,11 @@ describe('App live theme snapshot', () => {
     act(() => listener?.(appliedSnapshot));
     expect(container.textContent).toContain('Night');
     expect(container.textContent).toContain('已应用');
+    expect(container.textContent).toContain('未验证版本');
+
+    const launchButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('启动与代理'));
+    act(() => { void launchButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    expect(container.textContent).toContain('当前 Codex 版本已通过实时结构探针，但尚未正式验证。');
 
     root.unmount();
     expect(unsubscribe).toHaveBeenCalledOnce();

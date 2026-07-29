@@ -1,5 +1,4 @@
 import type { CompileThemeInput } from '../theme-runtime/compiler';
-import { getCodexVersionAdapter } from '../theme-runtime/codex-version-adapter';
 import type { AppSnapshot } from '../../shared/contracts/app-snapshot';
 
 export interface CodexPlusAutoAttachOptions {
@@ -42,7 +41,7 @@ export class CodexPlusAutoAttachCoordinator {
       this.options.packageVersion(),
       this.options.isAvailable(9229),
     ]);
-    if (generation !== this.generation || !theme || !packageVersion || !available || !getCodexVersionAdapter(packageVersion)) return;
+    if (generation !== this.generation || !theme || !packageVersion || !available) return;
 
     this.attaching = true;
     try {

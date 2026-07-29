@@ -40,6 +40,7 @@ export const AppSnapshotSchema = Type.Object(
     runtimeRunId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     runtimeErrorCode: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     runtimeAdapterId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+    runtimeCompatibility: Type.Optional(Type.Union([Type.Literal('verified'), Type.Literal('unverified'), Type.Null()])),
   },
   { additionalProperties: false },
 );

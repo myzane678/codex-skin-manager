@@ -20,6 +20,7 @@ export class ManagerService {
     runtimeRunId: null,
     runtimeErrorCode: null,
     runtimeAdapterId: null,
+    runtimeCompatibility: null,
   };
 
   constructor(private readonly dataRoot: string) {
@@ -126,7 +127,7 @@ export class ManagerService {
     this.state.recovery = 'running';
     await this.storage.setCurrentTheme(null);
     await this.storage.setProxyEnabled(false);
-    this.state = { theme: 'native', cdp: 'disconnected', proxy: 'disabled', recovery, runtimeRunId: null, runtimeErrorCode: null, runtimeAdapterId: null };
+    this.state = { theme: 'native', cdp: 'disconnected', proxy: 'disabled', recovery, runtimeRunId: null, runtimeErrorCode: null, runtimeAdapterId: null, runtimeCompatibility: null };
     return this.snapshot();
   }
 
@@ -178,6 +179,7 @@ export class ManagerService {
       `恢复: ${this.state.recovery}`,
       `注入运行 ID: ${this.state.runtimeRunId ?? '无'}`,
       `版本适配器: ${this.state.runtimeAdapterId ?? '无'}`,
+      `版本兼容性: ${this.state.runtimeCompatibility ?? '无'}`,
       `运行时错误: ${this.state.runtimeErrorCode ?? '无'}`,
       `当前主题: ${themeId ? `${themeId}@${themeVersion}` : '无'}`,
     ].join('\n');

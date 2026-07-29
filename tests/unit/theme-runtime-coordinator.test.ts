@@ -66,6 +66,7 @@ function createCdp(session: CdpPageSession): CdpPort {
 }
 
 const welcome = { result: { value: { adapterId: 'codex-26.715.4045', isCompatibleShell: true, isWelcomePage: true, nativeControlsVisible: true, composerVisible: true, projectSelectorVisible: true } } };
+const latestWelcome = { result: { value: { ...welcome.result.value, adapterId: 'codex-26.721.4979' } } };
 const task = { result: { value: { adapterId: 'codex-26.715.4045', isCompatibleShell: true, isWelcomePage: false, nativeControlsVisible: true, composerVisible: true, projectSelectorVisible: true } } };
 const incompatible = { result: { value: { adapterId: 'codex-26.715.4045', isCompatibleShell: false, isWelcomePage: false, nativeControlsVisible: true, composerVisible: true, projectSelectorVisible: true } } };
 
@@ -79,16 +80,42 @@ describe('ThemeRuntimeCoordinator', () => {
     expect(WELCOME_PROBE).toContain("document.querySelectorAll('[role=\"main\"]')");
   });
 
-  it('fails closed instead of injecting into an unverified Codex version', async () => {
-    const fixture = createSession([welcome]);
+  it('injects an unverified Codex version after the latest adapter probe passes', async () => {
+    const fixture = createSession([latestWelcome, latestWelcome]);
     const injector = { apply: vi.fn(() => Promise.resolve()), rollback: vi.fn(() => Promise.resolve()) };
     const state = vi.fn();
     const coordinator = new ThemeRuntimeCoordinator(createCdp(fixture.session), injector, () => 'run-1');
 
-    await coordinator.start(9335, theme, state, '99.0.0.0');
+    await coordinator.start(9335, theme, state, '26.721.11231.0');
+
+    expect(injector.apply).toHaveBeenCalledOnce();
+    expect(state).toHaveBeenLastCalledWith(expect.objectContaining({
+      phase: 'applied',
+      adapterId: 'codex-26.721.4979',
+      compatibility: 'unverified',
+    }));
+  });
+
+  it('reports compatibility degradation when an unverified-version probe fails', async () => {
+    vi.useFakeTimers();
+    const fixture = createSession([{
+      result: { value: { ...incompatible.result.value, adapterId: 'codex-26.721.4979' } },
+    }]);
+    const injector = { apply: vi.fn(() => Promise.resolve()), rollback: vi.fn(() => Promise.resolve()) };
+    const state = vi.fn();
+    const coordinator = new ThemeRuntimeCoordinator(createCdp(fixture.session), injector, () => 'run-1');
+
+    const started = coordinator.start(9335, theme, state, '26.721.11231.0');
+    await vi.runAllTimersAsync();
+    await started;
 
     expect(injector.apply).not.toHaveBeenCalled();
-    expect(state).toHaveBeenLastCalledWith(expect.objectContaining({ phase: 'compatibility-degraded', errorCode: 'CODEX_VERSION_UNSUPPORTED' }));
+    expect(state).toHaveBeenLastCalledWith(expect.objectContaining({
+      phase: 'compatibility-degraded',
+      errorCode: 'CODEX_PROBE_FAILED',
+      adapterId: 'codex-26.721.4979',
+    }));
+    vi.useRealTimers();
   });
 
   it('fails closed when the CDP probe identifies a different adapter', async () => {

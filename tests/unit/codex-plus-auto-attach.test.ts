@@ -43,10 +43,18 @@ describe('CodexPlusAutoAttachCoordinator', () => {
     expect(fixture.attach).toHaveBeenCalledWith(9229, theme, '26.721.4979.0');
   });
 
+  it('attaches an unverified package version for runtime probing', async () => {
+    const fixture = createFixture({ version: '26.721.11231.0' });
+
+    fixture.coordinator.start();
+
+    await vi.waitFor(() => expect(fixture.attach).toHaveBeenCalledOnce());
+    expect(fixture.attach).toHaveBeenCalledWith(9229, theme, '26.721.11231.0');
+  });
+
   it.each([
     { name: 'no selected theme', theme: null, state: runtimeState(), version: '26.721.4979.0', available: true },
     { name: 'an active CDP session', theme, state: runtimeState({ cdp: 'connected' }), version: '26.721.4979.0', available: true },
-    { name: 'an unsupported package version', theme, state: runtimeState(), version: '99.0.0.0', available: true },
     { name: 'a closed Codex++ CDP port', theme, state: runtimeState(), version: '26.721.4979.0', available: false },
   ])('does not attach with $name', async ({ theme: selectedTheme, state, version, available }) => {
     const fixture = createFixture({ theme: selectedTheme, state, version, available });

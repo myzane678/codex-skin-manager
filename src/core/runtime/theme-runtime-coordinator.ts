@@ -1,6 +1,6 @@
 import type { CdpPageSession, CdpPort, CdpTarget } from '../ports/runtime-ports';
 import { compileInjectionPlan, type CompileThemeInput, type InjectionPlan } from '../theme-runtime/compiler';
-import { buildCodexProbeScript, getCodexVersionAdapter, type CodexVersionAdapter } from '../theme-runtime/codex-version-adapter';
+import { buildCodexProbeScript, selectCodexVersionAdapter, type CodexVersionAdapter, type CodexVersionAdapterSelection } from '../theme-runtime/codex-version-adapter';
 
 export interface InjectionPort {
   apply(session: CdpPageSession, plan: InjectionPlan): Promise<void>;
@@ -17,6 +17,7 @@ export interface ThemeRuntimeStatus {
   runId?: string;
   errorCode?: string;
   adapterId?: string;
+  compatibility?: CodexVersionAdapterSelection['compatibility'];
 }
 
 interface WelcomeProbe {
@@ -64,6 +65,7 @@ export class ThemeRuntimeCoordinator {
   private refreshing: Promise<void> | null = null;
   private refreshQueued = false;
   private adapter: CodexVersionAdapter | null = null;
+  private compatibility: CodexVersionAdapterSelection['compatibility'] | null = null;
 
   constructor(
     private readonly cdp: CdpPort,
@@ -78,12 +80,11 @@ export class ThemeRuntimeCoordinator {
     this.port = port;
     this.theme = theme;
     this.onState = onState;
-    this.adapter = getCodexVersionAdapter(packageVersion);
-    if (!this.adapter) {
-      this.report({ phase: 'compatibility-degraded', errorCode: 'CODEX_VERSION_UNSUPPORTED' });
-      return;
-    }
+    const selection = selectCodexVersionAdapter(packageVersion);
+    this.adapter = selection.adapter;
+    this.compatibility = selection.compatibility;
     this.report({ phase: 'connecting' });
+    let probeFailed = false;
 
     for (let attempt = 0; attempt < 16 && generation === this.generation; attempt += 1) {
       try {
@@ -93,6 +94,11 @@ export class ThemeRuntimeCoordinator {
         if (selected === 'adapter-mismatch') {
           this.report({ phase: 'compatibility-degraded', errorCode: 'CODEX_ADAPTER_MISMATCH', adapterId: this.adapter.id });
           return;
+        }
+        if (selected === 'probe-failed') {
+          probeFailed = true;
+          await delay(500);
+          continue;
         }
         if (!selected) {
           await delay(500);
@@ -107,7 +113,11 @@ export class ThemeRuntimeCoordinator {
         if (attempt < 15) await delay(500);
       }
     }
-    if (generation === this.generation) this.report({ phase: 'failed', errorCode: 'CDP_READY_TIMEOUT' });
+    if (generation === this.generation) {
+      this.report(probeFailed
+        ? { phase: 'compatibility-degraded', errorCode: 'CODEX_PROBE_FAILED', adapterId: this.adapter.id }
+        : { phase: 'failed', errorCode: 'CDP_READY_TIMEOUT' });
+    }
   }
 
   refresh(): Promise<void> {
@@ -128,6 +138,7 @@ export class ThemeRuntimeCoordinator {
     this.onState = null;
     this.browserId = null;
     this.adapter = null;
+    this.compatibility = null;
     return true;
   }
 
@@ -159,7 +170,7 @@ export class ThemeRuntimeCoordinator {
       if (previousRun) await this.removeEarly(previousRun);
       this.theme = theme;
       this.activeRun = nextRun;
-      this.report(withBrowserId({ phase: 'applied', targetId: target.id, runId, adapterId: adapter.id }, this.browserId));
+      this.report(withBrowserId({ phase: 'applied', targetId: target.id, runId, adapterId: adapter.id, ...withCompatibility(this.compatibility) }, this.browserId));
       return true;
     } catch (error) {
       await this.removeEarly(nextRun);
@@ -198,8 +209,9 @@ export class ThemeRuntimeCoordinator {
     return true;
   }
 
-  private async openWelcomeSession(port: number, browserId: string, generation: number): Promise<{ target: CdpTarget; session: CdpPageSession } | 'adapter-mismatch' | null> {
+  private async openWelcomeSession(port: number, browserId: string, generation: number): Promise<{ target: CdpTarget; session: CdpPageSession } | 'adapter-mismatch' | 'probe-failed' | null> {
     const targets = await this.cdp.listTargets(port, browserId);
+    let probeFailed = false;
     for (const target of targets) {
       if (generation !== this.generation || target.type !== 'page') return null;
       const session = await this.cdp.openPageSession(target, port);
@@ -212,12 +224,13 @@ export class ThemeRuntimeCoordinator {
           return 'adapter-mismatch';
         }
         if (probe.isCompatibleShell && probe.nativeControlsVisible) return { target, session };
+        probeFailed = true;
       } catch {
         // 仅将暂态页面错误视为当前 target 不可用。
       }
       session.close();
     }
-    return null;
+    return probeFailed ? 'probe-failed' : null;
   }
 
   private async refreshLoop(generation: number): Promise<void> {
@@ -241,6 +254,10 @@ export class ThemeRuntimeCoordinator {
         const selected = await this.openWelcomeSession(port, browserId, generation);
         if (selected === 'adapter-mismatch') {
           this.report({ phase: 'compatibility-degraded', errorCode: 'CODEX_ADAPTER_MISMATCH', adapterId: adapter.id });
+          return;
+        }
+        if (selected === 'probe-failed') {
+          this.report({ phase: 'compatibility-degraded', errorCode: 'CODEX_PROBE_FAILED', adapterId: adapter.id });
           return;
         }
         if (!selected) return;
@@ -272,7 +289,7 @@ export class ThemeRuntimeCoordinator {
         } else if (this.injector.isApplied && !await this.injector.isApplied(activeSession, activeRun.runId)) {
           await this.injector.apply(activeSession, activeRun.plan);
         }
-        this.report({ phase: 'applied', browserId, targetId: activeTarget.id, runId: activeRun.runId });
+        this.report({ phase: 'applied', browserId, targetId: activeTarget.id, runId: activeRun.runId, adapterId: adapter.id, ...withCompatibility(this.compatibility) });
         return;
       }
       const runId = this.createRunId();
@@ -300,7 +317,7 @@ export class ThemeRuntimeCoordinator {
         if (this.activeRun === run) this.activeRun = null;
         return;
       }
-      this.report({ phase: 'applied', browserId, targetId: activeTarget.id, runId, adapterId: adapter.id });
+      this.report({ phase: 'applied', browserId, targetId: activeTarget.id, runId, adapterId: adapter.id, ...withCompatibility(this.compatibility) });
     } catch (error) {
       if (generation === this.generation && this.session?.isOpen()) {
         this.report(withBrowserId({
@@ -422,4 +439,8 @@ function withBrowserId(status: Omit<ThemeRuntimeStatus, 'browserId'>, browserId:
 
 function errorCode(error: unknown): string {
   return error instanceof Error ? error.message.slice(0, 80) : 'CDP_RUNTIME_FAILED';
+}
+
+function withCompatibility(compatibility: CodexVersionAdapterSelection['compatibility'] | null): Pick<ThemeRuntimeStatus, 'compatibility'> {
+  return compatibility ? { compatibility } : {};
 }

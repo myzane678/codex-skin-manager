@@ -24,6 +24,7 @@ const initialSnapshot: ManagerSnapshot = {
   runtimeRunId: null,
   runtimeErrorCode: null,
   runtimeAdapterId: null,
+  runtimeCompatibility: null,
   themes: [],
   diagnostic: '',
 };
@@ -155,7 +156,7 @@ export function App() {
           </button>
         </nav>
 
-        <CurrentThemeStatus theme={activeTheme} runtimeTheme={snapshot.theme} cdp={snapshot.cdp} />
+        <CurrentThemeStatus theme={activeTheme} runtimeTheme={snapshot.theme} cdp={snapshot.cdp} runtimeCompatibility={snapshot.runtimeCompatibility} />
       </aside>
 
       <main>
@@ -229,6 +230,9 @@ export function App() {
               ><Power size={17} />启动主题版</button>
             </header>
             {error && <div className="error-banner" role="alert">{error}</div>}
+            {snapshot.theme === 'applied' && snapshot.runtimeCompatibility === 'unverified' && (
+              <div className="compatibility-banner" role="status">当前 Codex 版本已通过实时结构探针，但尚未正式验证。</div>
+            )}
             <div className="settings-list">
               <div className="setting-row">
                 <div className="setting-icon"><ShieldCheck size={19} /></div>

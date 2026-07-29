@@ -64,6 +64,7 @@ dd { margin: 0; font: 600 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monos
 .danger-quiet { border: 1px solid #a85f59; color: #8c3f39; background: transparent; }
 .secondary { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 1px solid #b7bab5; border-radius: 6px; color: #40433f; background: #fff; cursor: pointer; }
 .error-banner { margin-top: 18px; padding: 10px 12px; border-left: 3px solid #9a4c46; color: #733c37; background: #f2e5e3; font-size: 12px; }
+.compatibility-banner { margin-top: 18px; padding: 10px 12px; border-left: 3px solid #a77920; color: #6b531e; background: #f4ecd7; font-size: 12px; }
 .image-source-selector { display: grid; justify-items: center; align-content: center; min-height: 330px; margin-top: 24px; padding: 32px; border: 1px dashed #9baaa4; border-radius: 7px; color: #4e665e; background: #edf2ef; text-align: center; }
 .image-source-selector h2 { margin: 14px 0 6px; color: #303c37; font-size: 18px; }
 .image-source-selector p { margin: 0; color: #68736e; font-size: 13px; }

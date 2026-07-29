@@ -36,4 +36,25 @@ describe('CurrentThemeStatus', () => {
     expect(markup).toContain('CDP 未连接');
     expect(markup).not.toContain('CURRENT THEME');
   });
+
+  it('warns when an applied theme uses an unverified Codex version', () => {
+    const markup = renderToStaticMarkup(
+      <CurrentThemeStatus
+        theme={{
+          id: 'amber-workbench',
+          version: '1.0.0',
+          name: '琥珀工作台',
+          source: 'unknown',
+          active: true,
+          accent: '#D68A22',
+          previewDataUrl: 'data:image/svg+xml;base64,',
+        }}
+        runtimeTheme="applied"
+        cdp="connected"
+        runtimeCompatibility="unverified"
+      />,
+    );
+
+    expect(markup).toContain('已应用 · 未验证版本 · CDP 已连接');
+  });
 });

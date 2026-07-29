@@ -25,6 +25,18 @@ describe('AppSnapshotSchema', () => {
     ).toBe(true);
   });
 
+  it('accepts an unverified runtime compatibility warning', () => {
+    expect(
+      validateAppSnapshot({
+        theme: 'applied',
+        cdp: 'connected',
+        proxy: 'disabled',
+        recovery: 'idle',
+        runtimeCompatibility: 'unverified',
+      }),
+    ).toBe(true);
+  });
+
   it('rejects unknown fields', () => {
     expect(
       validateAppSnapshot({

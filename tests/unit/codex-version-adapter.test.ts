@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCodexProbeScript, getCodexVersionAdapter } from '../../src/core/theme-runtime/codex-version-adapter';
+import { buildCodexProbeScript, getCodexVersionAdapter, selectCodexVersionAdapter } from '../../src/core/theme-runtime/codex-version-adapter';
 
 describe('Codex version adapter', () => {
   it('returns the verified adapter for the current Codex package', () => {
@@ -36,6 +36,20 @@ describe('Codex version adapter', () => {
 
   it('does not select an adapter for an unverified Codex version', () => {
     expect(getCodexVersionAdapter('99.0.0.0')).toBeNull();
+  });
+
+  it('marks an exact package-version adapter as verified', () => {
+    expect(selectCodexVersionAdapter('26.721.4979.0')).toMatchObject({
+      adapter: { id: 'codex-26.721.4979' },
+      compatibility: 'verified',
+    });
+  });
+
+  it('falls back to the latest adapter for an unverified package version', () => {
+    expect(selectCodexVersionAdapter('26.721.11231.0')).toMatchObject({
+      adapter: { id: 'codex-26.721.4979' },
+      compatibility: 'unverified',
+    });
   });
 
   it('builds a version-specific probe for the verified shell and native controls', () => {

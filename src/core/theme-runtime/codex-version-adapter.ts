@@ -15,6 +15,11 @@ export interface CodexVersionAdapter {
   shell: CodexShellSelectors;
 }
 
+export interface CodexVersionAdapterSelection {
+  adapter: CodexVersionAdapter;
+  compatibility: 'verified' | 'unverified';
+}
+
 const CODEX_26_715_4045: CodexVersionAdapter = {
   id: 'codex-26.715.4045',
   packageVersion: '26.715.4045.0',
@@ -49,9 +54,17 @@ const ADAPTERS = new Map<string, CodexVersionAdapter>([
   [CODEX_26_715_4045.packageVersion, CODEX_26_715_4045],
   [CODEX_26_721_4979.packageVersion, CODEX_26_721_4979],
 ]);
+const LATEST_ADAPTER = CODEX_26_721_4979;
 
 export function getCodexVersionAdapter(packageVersion: string): CodexVersionAdapter | null {
   return ADAPTERS.get(packageVersion) ?? null;
+}
+
+export function selectCodexVersionAdapter(packageVersion: string): CodexVersionAdapterSelection {
+  const adapter = getCodexVersionAdapter(packageVersion);
+  return adapter
+    ? { adapter, compatibility: 'verified' }
+    : { adapter: LATEST_ADAPTER, compatibility: 'unverified' };
 }
 
 export function buildCodexProbeScript(adapter: CodexVersionAdapter): string {
